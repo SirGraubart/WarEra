@@ -112,6 +112,9 @@
       <option value="other">Sonstige</option>
     </select>
     <input type="text" class="isearch" id="fSearch" placeholder="Item suchen..." oninput="applyFilter()" />
+    <select id="fItem" onchange="applyFilter()">
+      <option value="">Alle Items</option>
+    </select>
     <select id="fSort" onchange="applyFilter()">
       <option value="date_d">Datum ↓</option>
       <option value="date_a">Datum ↑</option>
@@ -119,7 +122,6 @@
       <option value="gold_a">Gold ↑</option>
     </select>
     <div class="mla" style="display:flex;gap:8px">
-    <button class="btnsm" onclick="showDebug()">🔍 Debug</button>
     <button class="btnsm" onclick="exportCSV()">CSV Export</button>
   </div>
   </div>
@@ -259,6 +261,13 @@ async function doLoad(){
     allTx=all.map(tx=>({...tx,_t:classify(tx,uid),_d:new Date(tx.createdAt||tx.timestamp||tx.date||0),_uid:uid}));
     filtered=[...allTx];
     curPage=0;
+
+    // Populate item dropdown
+    const items=[...new Set(allTx.map(tx=>getItemName(tx)).filter(i=>i&&i!=='—'))].sort();
+    const sel=document.getElementById('fItem');
+    sel.innerHTML='<option value="">Alle Items</option>';
+    items.forEach(i=>{const o=document.createElement('option');o.value=i;o.textContent=i;sel.appendChild(o);});
+
     setStatus('ok');
     renderStats();
     document.getElementById('stats').style.display='grid';
@@ -291,10 +300,12 @@ function renderStats(){
 
 function applyFilter(){
   const t=document.getElementById('fType').value;
+  const item=document.getElementById('fItem').value;
   const s=document.getElementById('fSearch').value.toLowerCase();
   const so=document.getElementById('fSort').value;
   filtered=allTx.filter(tx=>{
     if(t&&tx._t!==t)return false;
+    if(item&&getItemName(tx)!==item)return false;
     if(s){const n=getItemName(tx).toLowerCase();if(!n.includes(s))return false;}
     return true;
   });
@@ -357,9 +368,16 @@ function renderItemSummary(){
   document.getElementById('tableArea').style.display='none';
   document.getElementById('itemSummary').style.display='block';
 
-  // Group by itemCode
+  const itemFilter=document.getElementById('fItem').value;
+  const typeFilter=document.getElementById('fType').value;
+
+  // Group by itemCode, respecting active filters
   const map={};
-  allTx.forEach(tx=>{
+  allTx.filter(tx=>{
+    if(typeFilter&&tx._t!==typeFilter)return false;
+    if(itemFilter&&getItemName(tx)!==itemFilter)return false;
+    return true;
+  }).forEach(tx=>{
     const item=getItemName(tx);
     if(!map[item])map[item]={item,buyQty:0,buyGold:0,sellQty:0,sellGold:0};
     const qty=parseFloat(tx.quantity)||0;
